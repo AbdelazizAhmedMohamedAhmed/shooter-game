@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neon Siege · Shooter Game</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080d16;color:#e7f4ff;font:16px system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:28px 22px}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}h1{margin:0;font-size:28px;letter-spacing:-1px}small,.muted{color:#8195ac}.tag{color:#65ffd5;font-size:12px;letter-spacing:3px}section{position:relative;border:1px solid #25374d;border-radius:18px;overflow:hidden;background:#0c1422}canvas{display:block;width:100%;aspect-ratio:16/10;touch-action:none;cursor:crosshair}.hud{display:flex;gap:30px;position:absolute;top:20px;left:22px;pointer-events:none}.hud span{display:block;font-size:11px;letter-spacing:2px;color:#8195ac}.hud b{font-size:23px;font-variant-numeric:tabular-nums}.overlay{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#080d16c9;padding:25px}.overlay[hidden]{display:none}h2{font-size:clamp(32px,6vw,64px);margin:8px 0;letter-spacing:-2px}p{line-height:1.7}button{border:0;border-radius:9px;background:#65ffd5;color:#061710;font:700 15px system-ui;padding:15px 25px;cursor:pointer}button:focus-visible{outline:3px solid white;outline-offset:4px}footer{display:flex;justify-content:space-between;gap:20px;margin-top:18px;font-size:13px;color:#8195ac}kbd{color:#dbeeff;border:1px solid #33445a;border-radius:4px;padding:2px 5px}.touch{display:none;position:absolute;bottom:18px;left:18px;gap:5px}.touch button{padding:14px;background:#25374ddd;color:white;touch-action:none}.touch div{display:flex;justify-content:center;gap:5px}@media(pointer:coarse){.touch{display:grid}footer{display:block}}@media(max-width:550px){main{padding:18px 10px}.hud{gap:18px;top:12px;left:12px}.hud b{font-size:18px}header small{display:none}}
+</style>
+</head>
+<body><main>
+<header><div><div class="tag">ARCADE / SURVIVAL</div><h1>NEON SIEGE<span style="color:#65ffd5">.</span></h1></div><small>Your arena. Your last stand.</small></header>
+<section aria-label="Shooter game arena">
+<canvas id="arena" width="1000" height="625" aria-label="Top-down shooter. Move with WASD or arrow keys, aim with your mouse, and hold click or space to shoot."></canvas>
+<div class="hud" aria-live="off"><div><span>SCORE</span><b id="score">0</b></div><div><span>WAVE</span><b id="wave">1</b></div><div><span>HEALTH</span><b id="health">100</b></div><div><span>BEST</span><b id="best">0</b></div></div>
+<div id="overlay" class="overlay"><div class="tag" id="eyebrow">SYSTEM READY</div><h2 id="title">Hold the line.</h2><p id="message">Survive the swarm. Keep moving. Make every shot count.<br>Move with WASD, aim with your mouse, hold click to fire.</p><button id="start">Enter the arena →</button></div>
+<div class="touch" aria-label="Touch movement"><div><button data-key="w" aria-label="Move up">↑</button></div><div><button data-key="a" aria-label="Move left">←</button><button data-key="s" aria-label="Move down">↓</button><button data-key="d" aria-label="Move right">→</button></div></div>
+</section>
+<footer><div><kbd>W A S D</kbd> move &nbsp; <kbd>MOUSE</kbd> aim &nbsp; <kbd>CLICK / SPACE</kbd> fire &nbsp; <kbd>P</kbd> pause</div><div>On touch: arrows to move, hold the arena to aim & fire.</div></footer>
+</main>
+<script>
+'use strict';
+const canvas=document.querySelector('#arena'),ctx=canvas.getContext('2d');
+const ui=Object.fromEntries(['score','wave','health','best','overlay','eyebrow','title','message','start'].map(id=>[id,document.getElementById(id)]));
+const W=1000,H=625,keys=new Set(),aim={x:750,y:312};
+let state='ready',player,bullets=[],enemies=[],particles=[],score=0,wave=1,spawnLeft=0,spawnTimer=0,waveDelay=0,cooldown=0,shooting=false,last=0,best=0;
+try{best=Number(localStorage.getItem('neon-siege-best'))||0}catch{}
+ui.best.textContent=best;
+const rand=(a,b)=>a+Math.random()*(b-a);
+function updateHUD(){ui.score.textContent=score;ui.wave.textContent=wave;ui.health.textContent=Math.ceil(player.hp);ui.best.textContent=best}
+function begin(){player={x:W/2,y:H/2,r:14,hp:100,inv:0};bullets=[];enemies=[];particles=[];score=0;wave=1;spawnLeft=6;spawnTimer=.7;waveDelay=0;cooldown=0;keys.clear();shooting=false;state='playing';ui.overlay.hidden=true;updateHUD()}
+function show(label,title,message,button){ui.eyebrow.textContent=label;ui.title.textContent=title;ui.message.textContent=message;ui.start.textContent=button;ui.overlay.hidden=false}
+function pause(){if(state==='playing'){state='paused';keys.clear();shooting=false;show('TAKE A BREATHER','Arena paused.','Your run is waiting for you.','Resume →')}else if(state==='paused'){state='playing';ui.overlay.hidden=true}}
+ui.start.addEventListener('click',()=>{if(state==='paused'){state='playing';ui.overlay.hidden=true}else begin()});
+window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();keys.add(e.key.toLowerCase());if(e.code==='KeyP'&&!e.repeat)pause()});
+window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+window.addEventListener('blur',()=>{if(state==='playing')pause();keys.clear();shooting=false});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')pause()});
+function point(e){const b=canvas.getBoundingClientRect();aim.x=(e.clientX-b.left)*W/b.width;aim.y=(e.clientY-b.top)*H/b.height}
+canvas.addEventListener('pointermove',point);
+canvas.addEventListener('pointerdown',e=>{if(state!=='playing')return;point(e);shooting=true;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointerup',()=>shooting=false);canvas.addEventListener('pointercancel',()=>shooting=false);
+for(const b of document.querySelectorAll('[data-key]')){b.addEventListener('pointerdown',e=>{e.preventDefault();keys.add(b.dataset.key);b.setPointerCapture(e.pointerId)});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>keys.delete(b.dataset.key))}
+function burst(x,y,color,n=12){for(let i=0;i<n;i++)particles.push({x,y,vx:rand(-160,160),vy:rand(-160,160),life:rand(.15,.5),color})}
+function spawn(){const edge=Math.floor(rand(0,4));let x,y;if(edge<2){x=edge===0?-25:W+25;y=rand(80,H)}else{x=rand(0,W);y=edge===2?-25:H+25}const tank=wave>=3&&Math.random()<.23;enemies.push({x,y,r:tank?23:15,hp:tank?4:2,speed:(tank?45:75)+wave*5,color:tank?'#b28aff':'#ff647c'})}
+function step(dt){
+ const dx=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft')),dy=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup')),len=Math.hypot(dx,dy)||1;
+ player.x=Math.max(18,Math.min(W-18,player.x+dx/len*245*dt));player.y=Math.max(75,Math.min(H-18,player.y+dy/len*245*dt));player.inv-=dt;cooldown-=dt;
+ if((shooting||keys.has(' '))&&cooldown<=0){const a=Math.atan2(aim.y-player.y,aim.x-player.x);bullets.push({x:player.x+Math.cos(a)*22,y:player.y+Math.sin(a)*22,vx:Math.cos(a)*650,vy:Math.sin(a)*650,life:1.5});cooldown=.13}
+ spawnTimer-=dt;if(spawnLeft>0&&spawnTimer<=0){spawn();spawnLeft--;spawnTimer=Math.max(.25,.9-wave*.04)}
+ for(const b of bullets){b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;for(const e of enemies){if(e.hp>0&&Math.hypot(e.x-b.x,e.y-b.y)<e.r+4){e.hp--;b.life=0;burst(b.x,b.y,e.color,5);if(e.hp<=0){score+=e.r>20?30:10;burst(e.x,e.y,e.color)}break}}}
+ bullets=bullets.filter(b=>b.life>0&&b.x>-20&&b.x<W+20&&b.y>-20&&b.y<H+20);enemies=enemies.filter(e=>e.hp>0);
+ for(const e of enemies){const a=Math.atan2(player.y-e.y,player.x-e.x);e.x+=Math.cos(a)*e.speed*dt;e.y+=Math.sin(a)*e.speed*dt;if(Math.hypot(e.x-player.x,e.y-player.y)<e.r+player.r&&player.inv<=0){player.hp=Math.max(0,player.hp-20);player.inv=1;burst(player.x,player.y,'#65ffd5',18)}}
+ for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);
+ if(spawnLeft===0&&enemies.length===0){waveDelay+=dt;if(waveDelay>1.5){wave++;spawnLeft=6+wave*2;waveDelay=0;player.hp=Math.min(100,player.hp+10)}}
+ if(player.hp<=0){state='over';shooting=false;if(score>best){best=score;try{localStorage.setItem('neon-siege-best',String(best))}catch{}}show('RUN COMPLETE','Signal lost.', 'Score: '+score+' · Wave: '+wave+' · Best: '+best,'Try again →')}
+ updateHUD();
+}
+function circle(x,y,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
+function draw(){
+ ctx.fillStyle='#0c1422';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#172438';ctx.lineWidth=1;
+ for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+ ctx.strokeStyle='#65ffd52a';ctx.strokeRect(18,68,W-36,H-86);
+ for(const p of particles){ctx.globalAlpha=Math.min(1,p.life*3);circle(p.x,p.y,3,p.color)}ctx.globalAlpha=1;
+ ctx.shadowBlur=15;ctx.shadowColor='#65ffd5';for(const b of bullets)circle(b.x,b.y,4,'#b4ffe9');
+ for(const e of enemies){ctx.shadowColor=e.color;circle(e.x,e.y,e.r,e.color);circle(e.x,e.y,e.r*.5,'#0c1422')}
+ if(player){ctx.shadowColor='#65ffd5';ctx.globalAlpha=player.inv>0?.5+.5*Math.sin(performance.now()/45):1;circle(player.x,player.y,player.r,'#65ffd5');ctx.save();ctx.translate(player.x,player.y);ctx.rotate(Math.atan2(aim.y-player.y,aim.x-player.x));ctx.fillStyle='#d6fff5';ctx.fillRect(8,-4,19,8);ctx.restore();ctx.globalAlpha=1}
+ ctx.shadowBlur=0;ctx.strokeStyle='#65ffd5';ctx.beginPath();ctx.arc(aim.x,aim.y,9,0,Math.PI*2);ctx.moveTo(aim.x-14,aim.y);ctx.lineTo(aim.x-5,aim.y);ctx.moveTo(aim.x+5,aim.y);ctx.lineTo(aim.x+14,aim.y);ctx.stroke();
+ if(state==='playing'&&spawnLeft===0&&enemies.length===0){ctx.textAlign='center';ctx.fillStyle='#65ffd5';ctx.font='bold 24px system-ui';ctx.fillText('WAVE CLEARED · +10 HEALTH',W/2,H/2-65)}
+}
+function frame(time){const dt=Math.min((time-last)/1000,.033);last=time;if(state==='playing')step(dt);draw();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+</script></body></html>
